@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
-
-
 import sys
 from NeuroPy import *
 from time import sleep
@@ -445,9 +442,6 @@ if __name__ == '__main__':
     ex = MainWindow()
     sys.exit(app.exec_())
     Mw.stop()
-
-
-# In[ ]:
 
 
 
