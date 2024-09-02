@@ -1,32 +1,31 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[8]:
-
-
 import numpy as np
 import pickle5 as pickle
 from collections import OrderedDict
 
 def get_data():
+    # 데이터 로드
     with open("data.pickle", 'rb') as f: 
         return pickle.load(f)
 
 def get_model():
+    # 모델 로드
     with open("model.pickle", 'rb') as f: 
         return pickle.load(f)
         
 def save_model():
+    # 모델 저장
     global model
     model = eegNet
     with open('model.pickle', 'wb') as f:
         pickle.dump(model, f, pickle.HIGHEST_PROTOCOL)
 
 def softmax(x):
+    # Softmax 함수 구현
     x = x - np.max(x, axis=-1, keepdims=True)
     return np.exp(x) / np.sum(np.exp(x), axis=-1, keepdims=True)
 
 class SoftmaxWithLoss:
+    # 손실 함수와 Softmax 구현
     def __init__(self):
         self.loss = None
         self.y = None
@@ -39,6 +38,7 @@ class SoftmaxWithLoss:
         return self.loss
 
     def backward(self, dout=1):
+        # 역전파 계산
         batch_size = self.t.shape[0]
         if self.t.size == self.y.size:
             dx = (self.y - self.t) / batch_size
@@ -48,7 +48,8 @@ class SoftmaxWithLoss:
             dx = dx / batch_size
         return dx
         
-    def cross_entropy_error(slef, y, t):
+    def cross_entropy_error(self, y, t):
+        # 크로스 엔트로피 오차 계산
         if y.ndim == 1:
             t = t.reshape(1, t.size)
             y = y.reshape(1, y.size)
@@ -60,6 +61,7 @@ class SoftmaxWithLoss:
         return -np.sum(np.log(y[np.arange(batch_size), t] + 1e-7)) / batch_size
 
 class Relu:
+    # ReLU 활성화 함수
     def __init__(self):
         self.mask = None
 
@@ -67,18 +69,17 @@ class Relu:
         self.mask = (x <= 0)
         out = x.copy()
         out[self.mask] = 0
-
         return out
 
     def backward(self, dout):
         dout[self.mask] = 0
         dx = dout
-
         return dx
 
 class Affine:
+    # Affine 계층 구현
     def __init__(self, W, b):
-        self.W =W
+        self.W = W
         self.b = b
         
         self.x = None
@@ -90,25 +91,18 @@ class Affine:
         self.original_x_shape = x.shape
         x = x.reshape(x.shape[0], -1)
         self.x = x
-
         out = np.dot(self.x, self.W) + self.b
-
         return out
 
     def backward(self, dout):
         dx = np.dot(dout, self.W.T)
         self.dW = np.dot(self.x.T, dout)
         self.db = np.sum(dout, axis=0)
-        
         dx = dx.reshape(*self.original_x_shape)
         return dx
 
-
-# In[69]:
-
-
 class Adam:
-
+    # Adam 옵티마이저
     def __init__(self, lr=0.002, beta1=0.9, beta2=0.999):
         self.lr = lr
         self.beta1 = beta1
@@ -132,21 +126,15 @@ class Adam:
             self.v[key] += (1 - self.beta2) * (grads[key]**2 - self.v[key])      
             params[key] -= lr_t * self.m[key] / (np.sqrt(self.v[key]) + 1e-7)
 
-
-# In[63]:
-
-
 class MultiLayerNet:
-    
-    def __init__(self, input_size, hidden_size_list, output_size,
-                 activation='relu', weight_init_std='relu', weight_decay_lambda=0):
+    # 다층 신경망 구현
+    def __init__(self, input_size, hidden_size_list, output_size, activation='relu', weight_init_std='relu', weight_decay_lambda=0):
         self.input_size = input_size
         self.output_size = output_size
         self.hidden_size_list = hidden_size_list
         self.hidden_layer_num = len(hidden_size_list)
         self.weight_decay_lambda = weight_decay_lambda
         self.params = {}
-
         self.__init_weight(weight_init_std)
 
         activation_layer = {'relu': Relu}
@@ -157,12 +145,10 @@ class MultiLayerNet:
             self.layers['Activation_function' + str(idx)] = activation_layer[activation]()
 
         idx = self.hidden_layer_num + 1
-        self.layers['Affine' + str(idx)] = Affine(self.params['W' + str(idx)],
-            self.params['b' + str(idx)])
+        self.layers['Affine' + str(idx)] = Affine(self.params['W' + str(idx)], self.params['b' + str(idx)])
         self.lastLayer = SoftmaxWithLoss()
         
     def __init_weight(self, weight_init_std):
-    
         all_size_list = [self.input_size] + self.hidden_size_list + [self.output_size]
         for idx in range(1, len(all_size_list)):
             scale = weight_init_std
@@ -191,73 +177,17 @@ class MultiLayerNet:
             dout = layer.backward(dout)
             
         grads = {}
-        grads['W1'], grads['b1'] = self.layers['Affine1'].dW, self.layers['Affine1'].db
-        grads['W2'], grads['b2'] = self.layers['Affine2'].dW, self.layers['Affine2'].db
-        grads['W3'], grads['b3'] = self.layers['Affine3'].dW, self.layers['Affine3'].db
-        grads['W4'], grads['b4'] = self.layers['Affine4'].dW, self.layers['Affine4'].db
+        for idx in range(1, self.hidden_layer_num + 2):
+            grads['W' + str(idx)], grads['b' + str(idx)] = self.layers['Affine' + str(idx)].dW, self.layers['Affine' + str(idx)].db
         
         return grads
 
-
-# In[52]:
-
-
-class Model:
-    def __init__(self):
-        self.data = get_data()
-    
-    def makemodel():
-        eegNet3 = MultiLayerNet(10, [10, 5], 3)
-    
-    def sep(data):
-        x = np.zeros(10, int)
-        t = np.zeros(3, int)
-        
-        for i in range(len(data)):
-            x_p = data[i, :10]
-            x = np.vstack((x, x_p))
-            t_p = data[i, 10:13]
-            t = np.vstack((t, t_p))
-
-        x = np.delete(x, 0, 0)
-        x = np.delete(x, 0, 0)
-        t = np.delete(t, 0, 0)
-        t = np.delete(t, 0, 0)
-        return x, t
-    
-    def train():
-        x, t = sep(data)
-        learning_rate = 0.1
-        step = 10000
-        optimizer = Adam()
-
-        for i in range(step):
-            grads = eegNet3.gradient(x, t)
-            optimizer.update(eegNet3.params, grads)
-
-
-# In[47]:
-
-
+# 데이터 및 모델 초기화
 data = get_data()
-
-
-# In[48]:
-
-
-print(len(data))
-
-
-# In[76]:
-
-
-eegNet = get_model()
-
-
-# In[49]:
-
+eegNet = MultiLayerNet(10, [30, 20, 15], 3)
 
 def sep(data):
+    # 데이터 분리 함수
     x = np.zeros(10, int)
     t = np.zeros(3, int)
     
@@ -268,22 +198,11 @@ def sep(data):
         t = np.vstack((t, t_p))
 
     x = np.delete(x, 0, 0)
-    x = np.delete(x, 0, 0)
-    t = np.delete(t, 0, 0)
     t = np.delete(t, 0, 0)
     return x, t
 
-
-# In[66]:
-
-
-x, t = sep(data)
-
-
-# In[65]:
-
-
 def train():
+    # 모델 학습 함수
     x, t = sep(data)
     learning_rate = 0.01
     step = 20000
@@ -293,38 +212,17 @@ def train():
         grads = eegNet.gradient(x, t)
         optimizer.update(eegNet.params, grads)
 
-
-# In[70]:
-
-
-eegNet = MultiLayerNet(10, [30, 20, 15], 3)
-
-
-# In[71]:
-
-
+# 학습 실행
 train()
 
-
-# In[78]:
-
-
+# 모델 평가
+x, t = sep(data)
 correct = 0
 for idx in range(len(x)):
-    if (np.argmax(eegNet.predict(np.array([x[idx]])))) == (np.argmax(t[idx])):
-        correct = correct+1
+    if np.argmax(eegNet.predict(np.array([x[idx]]))) == np.argmax(t[idx]):
+        correct += 1
 
-print(correct/len(x))
+print(correct / len(x))
 
-
-# In[75]:
-
-
+# 모델 저장
 save_model()
-
-
-# In[ ]:
-
-
-
-
